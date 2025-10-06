@@ -1,436 +1,167 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <title>Map with air indicators</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ranking Mundial de Calidad del Aire (AQI)</title>
   <style>
-    html, body, #map { height:100%; margin:0; padding:0; }
-    .controls {
-      position:absolute; top:10px; right:10px; z-index:1000;
-      display:flex; flex-direction:column; gap:8px;
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
     }
-    .custom-button, select {
-      background:white; border:1px solid #ccc; border-radius:6px;
-      font-family:sans-serif; padding:6px 10px; cursor:pointer;
-      font-size:14px; box-shadow:0 1px 4px rgba(0,0,0,0.3);
+    header {
+      background: #0078d7;
+      color: white;
+      text-align: center;
+      padding: 1rem 0;
     }
-    .indicators-panel {
-      position:absolute; top:60px; left:10px; width:340px;
-      max-height:80%; overflow-y:auto; background:white;
-      border:1px solid #ccc; border-radius:8px; padding:10px 12px;
-      box-shadow:0 2px 6px rgba(0,0,0,0.3); font-family:sans-serif;
-      z-index:1100; display:none; scrollbar-width: thin;
+    main {
+      max-width: 900px;
+      margin: 30px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-    .indicators-close {
-      position:absolute; top:5px; right:8px; background:#eee; border:none;
-      border-radius:50%; width:22px; height:22px; cursor:pointer; font-weight:bold;
+    h1 {
+      text-align: center;
+      margin-top: 0;
     }
-    .indicator-item { margin-bottom:10px; }
-    .legend { font-size:12px; color:#555; margin-left:20px; }
-    .date-label {
-      position:absolute; bottom:15px; right:15px;
-      background:rgba(0,0,0,0.6); color:white;
-      padding:6px 12px; border-radius:6px;
-      font-family:sans-serif; font-size:14px;
-      display:none; z-index:1200;
+    select {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      margin-bottom: 15px;
     }
-    .legends-container {
-      border-top:1px solid #ccc; margin-top:10px; padding-top:6px;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
     }
-    .legend-item { text-align:center; margin-bottom:10px; }
-    .legend-item img {
-      width:100%; max-width:320px;
-      border:1px solid #ddd; border-radius:6px; background:white;
+    th {
+      background: #0078d7;
+      color: white;
+      text-align: left;
+      padding: 10px;
+    }
+    td {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+    }
+    tr:hover {
+      background: #f0f8ff;
+    }
+    .aqi-box {
+      padding: 5px 10px;
+      border-radius: 5px;
+      color: white;
+      font-weight: bold;
+      display: inline-block;
+      text-align: center;
+      min-width: 50px;
+    }
+    footer {
+      text-align: center;
+      padding: 15px;
+      font-size: 13px;
+      color: #555;
     }
   </style>
 </head>
 <body>
-  <div id="map"></div>
 
-  <div class="controls">
-    <input type="date" id="datePicker" class="custom-button" />
-    <button class="custom-button" id="toggleBtn">Switch to street map</button>
-    <button class="custom-button" id="indicatorsBtn">Indicators view</button>
-    <button id="btnAQICN" class="custom-button">Monitoring points</button>
-    <input type="text" id="aqiFilter" class="custom-button" placeholder="Filter region or city" style="display:none;" />
-    <button id="btnClearAQI" class="custom-button" style="display:none;">Clear points</button>
-  </div>
+<header>
+  <h2>🌍 Ranking Mundial de Calidad del Aire (AQI)</h2>
+</header>
 
-  <div class="indicators-panel" id="indicatorsPanel">
-    <button class="indicators-close" id="closeIndicators">×</button>
-    <h4>--Indicators--</h4>
-
-    <label for="tempoTimestamp" style="display:block; font-size:13px; margin-bottom:4px;">🕒 Select available time:</label>
-    <select id="tempoTimestamp" style="width:100%; margin-bottom:10px;">
-      <option value="">Select an indicator first</option>
+<main>
+  <div style="text-align:center;">
+    <label for="countryFilter"><strong>Filtrar por país:</strong></label><br>
+    <select id="countryFilter">
+      <option value="">Todos</option>
     </select>
-
-    <div id="indicatorsList"></div>
-    <hr>
-
-    <h5 style="margin:8px 0 4px;">Animation</h5>
-    <label>Start:</label>
-    <select id="tempoStart" style="width:100%; margin-bottom:4px;"></select>
-    <label>Stop:</label>
-    <select id="tempoEnd" style="width:100%; margin-bottom:8px;"></select>
-    <button id="startTempoAnim" class="custom-button">Start</button>
-    <button id="stopTempoAnim" class="custom-button" disabled>Stop</button>
-
-    <div style="font-size:12px; color:#444; margin-top:8px;">
-      Dates are automatically retrieved from the GIBS (NASA) server.
-      If no data is available, it may appear empty.
-    </div>
-    <div class="legends-container" id="legendsContainer"></div>
   </div>
 
-  <div class="date-label" id="dateLabel"></div>
+  <table id="aqiTable">
+    <thead>
+      <tr>
+        <th>Posición</th>
+        <th>Estación</th>
+        <th>País</th>
+        <th>AQI</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</main>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<footer>
+  Datos en tiempo real de <a href="https://aqicn.org" target="_blank">AQICN API</a>
+</footer>
 
-  <script>
-  (async function() {
-    function formatLocalDate(d){
-      const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
-      return `${y}-${m}-${day}`;
-    }
-
-    const map = L.map("map", { center: [-9.2, -75], zoom: 4 });
-
-    document.getElementById("btnAQICN").addEventListener("click", () => {
-      loadAQICNMonitoring(map);
-    });
-
-    const todayStr = formatLocalDate(new Date());
-    const hour = new Date().getHours();
-
-    function createLayers(dateStr){
-      const modis = L.tileLayer(
-        `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${dateStr}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpeg`,
-        { maxZoom:9, attribution:"NASA MODIS Terra" }
-      );
-      const viirs = L.tileLayer(
-        `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_DayNightBand_At_Sensor_Radiance/default/${dateStr}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`,
-        { maxZoom:8, attribution:"NASA VIIRS" }
-      );
-      return { modis, viirs };
-    }
-
-    let { modis, viirs } = createLayers(todayStr);
-    const streets = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19});
-    let satelliteLayer = (hour >= 6 && hour < 18) ? modis : viirs;
-    satelliteLayer.addTo(map);
-
-    let showingStreets = false;
-    const btn = document.getElementById("toggleBtn");
-    const datePicker = document.getElementById("datePicker");
-    datePicker.value = todayStr;
-    datePicker.max = todayStr;
-
-    async function fadeToNewLayer(dateStr){
-      const newLayers = createLayers(dateStr);
-      const nextLayer = (hour >= 6 && hour < 18) ? newLayers.modis : newLayers.viirs;
-      map.removeLayer(satelliteLayer);
-      nextLayer.addTo(map);
-      satelliteLayer = nextLayer;
-      updateIndicatorLayers(selectedIso);
-    }
-
-    btn.addEventListener("click", () => {
-      if(showingStreets){
-        map.removeLayer(streets);
-        map.addLayer(satelliteLayer);
-        btn.textContent="Switch to street map";
-        showingStreets=false;
-      } else {
-        map.removeLayer(satelliteLayer);
-        map.addLayer(streets);
-        btn.textContent="Switch to satellite map";
-        showingStreets=true;
-      }
-    });
-
-    datePicker.addEventListener("change", () => {
-      if(datePicker.value) fadeToNewLayer(datePicker.value);
-    });
-
-    // === Indicadores TEMPO ===
-    const indicatorsBtn = document.getElementById("indicatorsBtn");
-    const indicatorsPanel = document.getElementById("indicatorsPanel");
-    const closeIndicators = document.getElementById("closeIndicators");
-    const timestampSelect = document.getElementById("tempoTimestamp");
-    const tempoStart = document.getElementById("tempoStart");
-    const tempoEnd = document.getElementById("tempoEnd");
-    const startTempoAnim = document.getElementById("startTempoAnim");
-    const stopTempoAnim = document.getElementById("stopTempoAnim");
-    const indicatorsList = document.getElementById("indicatorsList");
-    const legendsContainer = document.getElementById("legendsContainer");
-    const dateLabel = document.getElementById("dateLabel");
-
-    const validIndicators = [
-      { id:"TEMPO_L3_Formaldehyde_Vertical_Column", name:"Formaldehyde (L3, Vertical Column, Subdaily, TEMPO)", legend:"https://gibs.earthdata.nasa.gov/legends/TEMPO_HCHO_Vertical_Column_H.svg" },
-      { id:"TEMPO_L3_NO2_Vertical_Column_Troposphere", name:"Nitrogen Dioxide (L3, Vertical Column Stratosphere, Subdaily, TEMPO)", legend:"https://gibs.earthdata.nasa.gov/legends/TEMPO_NO2_Vertical_Column_Troposphere_H.svg" },
-      { id:"TEMPO_L3_Ozone_Profile_Troposphere_Column", name:"Ozone Profile (L3, Troposphere Column, Subdaily, TEMPO)", legend:"https://gibs.earthdata.nasa.gov/legends/TEMPO_Troposphere_Ozone_Column_H.svg" },
-      { id:"TEMPO_L3_Cloud_Cloud_Pressure_Total", name:"Clouds (L3, Cloud Pressure Total, Subdaily, TEMPO)", legend:"https://gibs.earthdata.nasa.gov/legends/TEMPO_Cloud_Cloud_Pressure_Total_H.svg" },
-      { id:"GHRSST_L4_MUR_Sea_Surface_Temperature", name:"Sea Surface Temperature (L4, MUR Global Foundation, GHRSST)", legend:"https://gibs.earthdata.nasa.gov/legends/GHRSST_Sea_Surface_Temperature_H.svg" }
-    ];
-
-    let indicatorLayers = {};
-    let selectedIso = null;
-    let tempoTimes = [];
-    let tempoTimer = null;
-
-    async function loadTimesForLayer(layerId){
-      try {
-        const res = await fetch("https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml");
-        const text = await res.text();
-        const xml = new DOMParser().parseFromString(text, "application/xml");
-        const node = [...xml.querySelectorAll("Layer")].find(l => {
-          const idNode = l.querySelector("ows\\:Identifier, Identifier");
-          return idNode && idNode.textContent.trim() === layerId;
-        });
-        if(!node) return [];
-        const dim = node.querySelector("Dimension, ows\\:Dimension");
-        if(!dim) return [];
-        const values = [...dim.querySelectorAll("Value")]
-          .map(v => v.textContent.match(/^([^/]+)/)?.[1])
-          .filter(Boolean);
-        return values;
-      } catch(e){ console.error(e); return []; }
-    }
-
-    async function updateTimestampSelectorFor(layerId){
-      timestampSelect.innerHTML='<option>Loading...</option>';
-      tempoStart.innerHTML=""; tempoEnd.innerHTML="";
-      const times = await loadTimesForLayer(layerId);
-      tempoTimes = times;
-      timestampSelect.innerHTML="";
-      if(times.length===0){
-        timestampSelect.innerHTML='<option value="">No available times</option>';
-        return;
-      }
-      times.forEach(t=>{
-        const o=document.createElement("option");
-        o.value=t; o.textContent=t; timestampSelect.appendChild(o);
-      });
-      selectedIso = times[times.length-1];
-      timestampSelect.value = selectedIso;
-      times.forEach(t=>{
-        const a=document.createElement("option");
-        a.value=t; a.textContent=t;
-        tempoStart.appendChild(a.cloneNode(true));
-        tempoEnd.appendChild(a);
-      });
-      tempoStart.value=times[0];
-      tempoEnd.value=times[times.length-1];
-    }
-
-    function addLegend(id,url,name){
-      const div=document.createElement("div");
-      div.className="legend-item";
-      div.id=`legend_${id}`;
-      div.innerHTML=`<strong>${name}</strong><br><img src="${url}" alt="${name}">`;
-      legendsContainer.appendChild(div);
-    }
-
-    function removeLegend(id){
-      const el=document.getElementById(`legend_${id}`);
-      if(el) el.remove();
-    }
-
-    validIndicators.forEach(ind=>{
-      const div=document.createElement("div");
-      div.className="indicator-item";
-      div.innerHTML=`<label><input type="checkbox" id="${ind.id}"> ${ind.name}</label>
-                     <div class="legend">🛰️ ${ind.id}</div>`;
-      indicatorsList.appendChild(div);
-      const checkbox=div.querySelector("input");
-      checkbox.addEventListener("change", async e=>{
-        const id=ind.id;
-        if(e.target.checked){
-          await updateTimestampSelectorFor(ind.id);
-          if(!selectedIso){alert("No available times for this layer."); return;}
-          indicatorLayers[id] = L.tileLayer(
-            `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${id}/default/${selectedIso}/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png`,
-            { maxZoom:9, opacity:0.8, attribution:"NASA GIBS" }
-          ).addTo(map);
-          addLegend(id, ind.legend, ind.name);
-        } else if(indicatorLayers[id]){
-          map.removeLayer(indicatorLayers[id]);
-          delete indicatorLayers[id];
-          removeLegend(id);
-        }
-      });
-    });
-
-    timestampSelect.addEventListener("change", ()=>{
-      selectedIso=timestampSelect.value;
-      updateIndicatorLayers(selectedIso);
-    });
-
-    function updateIndicatorLayers(iso){
-      for(const id in indicatorLayers){
-        if(map.hasLayer(indicatorLayers[id])){
-          const oldLayer=indicatorLayers[id];
-          const newLayer=L.tileLayer(
-            `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${id}/default/${iso}/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png`,
-            {maxZoom:9,opacity:0}
-          );
-          newLayer.addTo(map);
-          let opacity=0;
-          const fadeInterval=setInterval(()=>{
-            opacity+=0.1;
-            newLayer.setOpacity(opacity);
-            oldLayer.setOpacity(1-opacity);
-            if(opacity>=1){
-              clearInterval(fadeInterval);
-              map.removeLayer(oldLayer);
-              indicatorLayers[id]=newLayer;
-            }
-          },100);
-        }
-      }
-    }
-
-    startTempoAnim.addEventListener("click", ()=>{
-      if(!tempoTimes.length){alert("Select a gas first."); return;}
-      const i1=tempoTimes.indexOf(tempoStart.value);
-      const i2=tempoTimes.indexOf(tempoEnd.value);
-      if(i1===-1||i2===-1){alert("Select valid dates."); return;}
-      let subset=tempoTimes.slice(Math.min(i1,i2),Math.max(i1,i2)+1);
-      if(subset.length===0){alert("Empty range."); return;}
-      clearInterval(tempoTimer);
-      let idx=0;
-      startTempoAnim.disabled=true;
-      stopTempoAnim.disabled=false;
-      dateLabel.style.display="block";
-      function animate(){
-        const t=subset[idx];
-        selectedIso=t;
-        updateIndicatorLayers(t);
-        dateLabel.textContent=`🕒 ${t}`;
-        idx++;
-        if(idx>=subset.length) idx=0;
-      }
-      animate();
-      tempoTimer=setInterval(animate,2500);
-    });
-
-    stopTempoAnim.addEventListener("click", ()=>{
-      clearInterval(tempoTimer);
-      tempoTimer=null;
-      dateLabel.style.display="none";
-      startTempoAnim.disabled=false;
-      stopTempoAnim.disabled=true;
-    });
-
-    indicatorsBtn.addEventListener("click",()=>{
-      indicatorsPanel.style.display = indicatorsPanel.style.display==="none"?"block":"none";
-    });
-    closeIndicators.addEventListener("click",()=>{ indicatorsPanel.style.display="none"; });
-  })();
-  </script>
-
-  <!-- MONITORING POINTS (AQICN) -->
 <script>
-let allMarkers = {};
-let aqiControlsVisible = false;
+const token = "090ca286c1bb00d992871976d77c05b6347a17d1";
+const url = `https://api.waqi.info/map/bounds/?token=${token}&latlng=-56,-180,70,180`; // Global
 
-function loadAQICNMonitoring(map) {
-  const filterInput = document.getElementById("aqiFilter");
-  const clearBtn = document.getElementById("btnClearAQI");
-
-  // Mostrar u ocultar controles
-  if (!aqiControlsVisible) {
-    filterInput.style.display = "block";
-    clearBtn.style.display = "block";
-    aqiControlsVisible = true;
-  } else {
-    filterInput.style.display = "none";
-    clearBtn.style.display = "none";
-    aqiControlsVisible = false;
-  }
-
-  // Si ya hay puntos, no recargamos todos otra vez
-  if (Object.keys(allMarkers).length > 0) return;
-
-  const token = "090ca286c1bb00d992871976d77c05b6347a17d1"; // tu token de AQICN
-  const bounds = map.getBounds();
-  const boundsString = `${bounds.getNorth()},${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()}`;
-
-  fetch(`https://api.waqi.info/v2/map/bounds/?latlng=${boundsString}&token=${token}`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.status !== "ok") throw new Error(data.data);
-      removeAQIMarkers(map);
-      data.data.forEach(station => {
-        const iw = 83, ih = 107;
-        const icon = L.icon({
-          iconUrl: `https://waqi.info/mapicon/${station.aqi}.30.png`,
-          iconSize: [iw / 2, ih / 2],
-          iconAnchor: [iw / 4, ih / 2 - 5],
-        });
-        const marker = L.marker([station.lat, station.lon], {
-          icon,
-          title: station.station.name,
-        }).addTo(map);
-
-        marker.on("click", () => {
-          fetch(`https://api.waqi.info/feed/@${station.uid}/?token=${token}`)
-            .then(r => r.json())
-            .then(info => {
-              if (info.status !== "ok") return;
-              const m = info.data;
-              let html = `<b>${m.city.name}</b><br>AQI: <b>${m.aqi}</b><br>`;
-              html += `<small>Updated: ${new Date(m.time.v * 1000).toLocaleTimeString()}</small><br>`;
-              if (m.iaqi) {
-                html += "<b>Pollutants:</b><br>";
-                for (let p in m.iaqi) {
-                  html += `${p.toUpperCase()}: ${m.iaqi[p].v}<br>`;
-                }
-              }
-              marker.bindPopup(html).openPopup();
-            });
-        });
-        allMarkers[station.uid] = marker;
-      });
-
-      // Filtro dinámico por texto
-      filterInput.addEventListener("input", () => {
-        const term = filterInput.value.toLowerCase();
-        Object.values(allMarkers).forEach(m => {
-          const name = m.options.title.toLowerCase();
-            if (name.includes(term)) {
-            if (!map.hasLayer(m)) m.addTo(map);
-          } else {
-            if (map.hasLayer(m)) map.removeLayer(m);
-          }
-        });
-      });
-
-      // Botón para eliminar todos los marcadores y ocultar el filtro
-      clearBtn.addEventListener("click", () => {
-        removeAQIMarkers(map);
-        filterInput.value = "";
-        filterInput.style.display = "none";
-        clearBtn.style.display = "none";
-      });
-    })
-    .catch(err => {
-      console.error("Error loading AQICN data:", err);
-      alert("Failed to load AQI monitoring points. Try again later.");
-    });
+async function getAQIData() {
+  const response = await fetch(url);
+  const data = await response.json();
+  if (data.status !== "ok") throw new Error("Error al obtener datos AQI");
+  return data.data.filter(s => s.aqi !== "-" && s.aqi !== null);
 }
 
-function removeAQIMarkers(map) {
-  for (const uid in allMarkers) {
-    if (map.hasLayer(allMarkers[uid])) {
-      map.removeLayer(allMarkers[uid]);
-    }
-  }
-  allMarkers = {};
+function aqiColor(aqi) {
+  if (aqi <= 50) return "#009966";      // Buena
+  if (aqi <= 100) return "#ffde33";     // Moderada
+  if (aqi <= 150) return "#ff9933";     // Dañina sensibles
+  if (aqi <= 200) return "#cc0033";     // Dañina
+  if (aqi <= 300) return "#660099";     // Muy dañina
+  return "#7e0023";                     // Peligrosa
 }
+
+function renderTable(stations) {
+  const tbody = document.querySelector("#aqiTable tbody");
+  tbody.innerHTML = "";
+  stations.slice(0, 100).forEach((s, i) => {
+    const tr = document.createElement("tr");
+    const color = aqiColor(s.aqi);
+    tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td>${s.station.name}</td>
+      <td>${s.station.country || "Desconocido"}</td>
+      <td><span class="aqi-box" style="background:${color}">${s.aqi}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+getAQIData().then(stations => {
+  stations.sort((a, b) => b.aqi - a.aqi);
+
+  const countries = [...new Set(stations.map(s => s.station.country || "Desconocido"))].sort();
+  const select = document.getElementById("countryFilter");
+  countries.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    select.appendChild(opt);
+  });
+
+  renderTable(stations);
+
+  select.addEventListener("change", () => {
+    const country = select.value;
+    const filtered = country ? stations.filter(s => s.station.country === country) : stations;
+    renderTable(filtered);
+  });
+}).catch(err => {
+  document.querySelector("main").innerHTML = "<p>Error cargando datos. Intenta nuevamente.</p>";
+  console.error(err);
+});
 </script>
+
 </body>
 </html>
