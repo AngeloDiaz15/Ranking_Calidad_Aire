@@ -5,70 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ranking Mundial de Calidad del Aire (AQI)</title>
   <style>
-    body {
-      font-family: "Segoe UI", Arial, sans-serif;
-      background: #f5f7fa;
-      margin: 0;
-      padding: 0;
-    }
-    header {
-      background: #0078d7;
-      color: white;
-      text-align: center;
-      padding: 1rem 0;
-    }
-    main {
-      max-width: 900px;
-      margin: 30px auto;
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    h1 {
-      text-align: center;
-      margin-top: 0;
-    }
-    select {
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      font-size: 14px;
-      margin-bottom: 15px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 15px;
-    }
-    th {
-      background: #0078d7;
-      color: white;
-      text-align: left;
-      padding: 10px;
-    }
-    td {
-      padding: 8px;
-      border-bottom: 1px solid #eee;
-    }
-    tr:hover {
-      background: #f0f8ff;
-    }
-    .aqi-box {
-      padding: 5px 10px;
-      border-radius: 5px;
-      color: white;
-      font-weight: bold;
-      display: inline-block;
-      text-align: center;
-      min-width: 50px;
-    }
-    footer {
-      text-align: center;
-      padding: 15px;
-      font-size: 13px;
-      color: #555;
-    }
+    body { font-family: "Segoe UI", Arial, sans-serif; background: #f5f7fa; margin: 0; }
+    header { background: #0078d7; color: white; text-align: center; padding: 1rem 0; }
+    main { max-width: 900px; margin: 30px auto; background: white; padding: 20px;
+           border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    select { padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; margin-bottom: 15px; }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; }
+    th { background: #0078d7; color: white; padding: 10px; text-align: left; }
+    td { padding: 8px; border-bottom: 1px solid #eee; }
+    tr:hover { background: #f0f8ff; }
+    .aqi-box { padding: 5px 10px; border-radius: 5px; color: white; font-weight: bold; display: inline-block; min-width: 50px; text-align: center; }
   </style>
 </head>
 <body>
@@ -80,46 +26,46 @@
 <main>
   <div style="text-align:center;">
     <label for="countryFilter"><strong>Filtrar por país:</strong></label><br>
-    <select id="countryFilter">
-      <option value="">Todos</option>
-    </select>
+    <select id="countryFilter"><option value="">Todos</option></select>
   </div>
 
   <table id="aqiTable">
     <thead>
-      <tr>
-        <th>Posición</th>
-        <th>Estación</th>
-        <th>País</th>
-        <th>AQI</th>
-      </tr>
+      <tr><th>Posición</th><th>Estación</th><th>País</th><th>AQI</th></tr>
     </thead>
     <tbody></tbody>
   </table>
 </main>
 
-<footer>
-  Datos en tiempo real de <a href="https://aqicn.org" target="_blank">AQICN API</a>
+<footer style="text-align:center; padding:10px; font-size:13px;">
+  Datos de <a href="https://aqicn.org" target="_blank">AQICN</a> y geocodificación de <a href="https://nominatim.org" target="_blank">OpenStreetMap</a>.
 </footer>
 
 <script>
 const token = "090ca286c1bb00d992871976d77c05b6347a17d1";
-const url = `https://api.waqi.info/map/bounds/?token=${token}&latlng=-56,-180,70,180`; // Global
+const url = `https://api.waqi.info/map/bounds/?token=${token}&latlng=-56,-180,70,180`;
 
-async function getAQIData() {
-  const response = await fetch(url);
-  const data = await response.json();
-  if (data.status !== "ok") throw new Error("Error al obtener datos AQI");
-  return data.data.filter(s => s.aqi !== "-" && s.aqi !== null);
+async function getCountry(lat, lon) {
+  const cacheKey = `${lat},${lon}`;
+  if (countryCache[cacheKey]) return countryCache[cacheKey];
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=3`);
+    const data = await res.json();
+    const country = data.address?.country || "Desconocido";
+    countryCache[cacheKey] = country;
+    return country;
+  } catch {
+    return "Desconocido";
+  }
 }
 
 function aqiColor(aqi) {
-  if (aqi <= 50) return "#009966";      // Buena
-  if (aqi <= 100) return "#ffde33";     // Moderada
-  if (aqi <= 150) return "#ff9933";     // Dañina sensibles
-  if (aqi <= 200) return "#cc0033";     // Dañina
-  if (aqi <= 300) return "#660099";     // Muy dañina
-  return "#7e0023";                     // Peligrosa
+  if (aqi <= 50) return "#009966";
+  if (aqi <= 100) return "#ffde33";
+  if (aqi <= 150) return "#ff9933";
+  if (aqi <= 200) return "#cc0033";
+  if (aqi <= 300) return "#660099";
+  return "#7e0023";
 }
 
 function renderTable(stations) {
@@ -131,17 +77,31 @@ function renderTable(stations) {
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td>${s.station.name}</td>
-      <td>${s.station.country || "Desconocido"}</td>
-      <td><span class="aqi-box" style="background:${color}">${s.aqi}</span></td>
-    `;
+      <td>${s.country}</td>
+      <td><span class="aqi-box" style="background:${color}">${s.aqi}</span></td>`;
     tbody.appendChild(tr);
   });
 }
 
-getAQIData().then(stations => {
-  stations.sort((a, b) => b.aqi - a.aqi);
+const countryCache = {};
+let stations = [];
 
-  const countries = [...new Set(stations.map(s => s.station.country || "Desconocido"))].sort();
+async function main() {
+  const response = await fetch(url);
+  const data = await response.json();
+  if (data.status !== "ok") throw new Error("Error al obtener datos AQI");
+
+  // Filtrar y ordenar por AQI
+  const rawStations = data.data.filter(s => s.aqi !== "-" && s.aqi !== null).sort((a,b)=>b.aqi - a.aqi);
+
+  // Obtener país para cada estación
+  for (let s of rawStations.slice(0, 300)) { // limitar a 300 para no saturar
+    const [lat, lon] = s.geo;
+    s.country = await getCountry(lat, lon);
+  }
+
+  stations = rawStations;
+  const countries = [...new Set(stations.map(s => s.country))].sort();
   const select = document.getElementById("countryFilter");
   countries.forEach(c => {
     const opt = document.createElement("option");
@@ -154,14 +114,15 @@ getAQIData().then(stations => {
 
   select.addEventListener("change", () => {
     const country = select.value;
-    const filtered = country ? stations.filter(s => s.station.country === country) : stations;
+    const filtered = country ? stations.filter(s => s.country === country) : stations;
     renderTable(filtered);
   });
-}).catch(err => {
+}
+
+main().catch(e => {
   document.querySelector("main").innerHTML = "<p>Error cargando datos. Intenta nuevamente.</p>";
-  console.error(err);
+  console.error(e);
 });
 </script>
-
 </body>
 </html>
