@@ -2,28 +2,35 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Ranking de Calidad del Aire (AQI) - WAQI API</title>
+  <title>Ranking Global de Calidad del Aire (AQI)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background: #f2f2f2;
+      background: #f7f9fb;
       margin: 0;
       padding: 0;
       text-align: center;
     }
     h1 {
-      background: #007bff;
+      background: linear-gradient(90deg, #007bff, #0056b3);
       color: white;
       margin: 0;
       padding: 1rem;
+      font-size: 1.6rem;
     }
     select, button {
-      padding: 0.5rem 1rem;
+      padding: 0.6rem 1rem;
       margin: 1rem;
       font-size: 1rem;
-      border-radius: 6px;
+      border-radius: 8px;
       border: 1px solid #ccc;
+      cursor: pointer;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
     }
     table {
       width: 90%;
@@ -52,23 +59,20 @@
   </style>
 </head>
 <body>
-  <h1>🌍 Ranking de Calidad del Aire (AQI)</h1>
+  <h1>🌍 Ranking Global de Calidad del Aire (AQI)</h1>
 
-  <label for="countrySelect">Selecciona un país:</label>
-  <select id="countrySelect">
-    <option value="none">-- Elegir país --</option>
-    <option value="peru">Perú</option>
-    <option value="mexico">México</option>
-    <option value="chile">Chile</option>
-    <option value="colombia">Colombia</option>
-    <option value="argentina">Argentina</option>
-    <option value="usa">Estados Unidos</option>
-    <option value="spain">España</option>
-    <option value="france">Francia</option>
-    <option value="italy">Italia</option>
+  <label for="continentSelect">Filtrar por continente:</label>
+  <select id="continentSelect">
+    <option value="world">🌎 Global</option>
+    <option value="southamerica">América del Sur</option>
+    <option value="northamerica">América del Norte</option>
+    <option value="europe">Europa</option>
+    <option value="asia">Asia</option>
+    <option value="africa">África</option>
+    <option value="oceania">Oceanía</option>
   </select>
 
-  <button id="loadBtn">Cargar datos</button>
+  <button id="loadBtn">Actualizar</button>
 
   <table id="rankingTable">
     <thead>
@@ -80,29 +84,27 @@
       </tr>
     </thead>
     <tbody>
-      <tr><td colspan="4">Selecciona un país y presiona "Cargar datos"</td></tr>
+      <tr><td colspan="4">Cargando ranking global...</td></tr>
     </tbody>
   </table>
 
   <script>
     const token = "090ca286c1bb00d992871976d77c05b6347a17d1";
 
-    // Coordenadas aproximadas por país (lat1, lng1, lat2, lng2)
-    const countryBounds = {
-      peru: [-18.35, -81.35, -0.05, -68.65],
-      mexico: [14.4, -118.5, 32.7, -86.5],
-      chile: [-56, -75, -17, -66],
-      colombia: [-5, -79, 13, -66],
-      argentina: [-55, -73.5, -21, -53],
-      usa: [24.5, -125, 49.5, -66.9],
-      spain: [36, -9.5, 43.8, 4.5],
-      france: [41, -5.5, 51.5, 9.5],
-      italy: [36.5, 6.5, 47.2, 18.5],
+    // Coordenadas (bounds) por continente: [lat1, lng1, lat2, lng2]
+    const continentBounds = {
+      world: [-85, -180, 85, 180],
+      southamerica: [-56, -82, 13, -34],
+      northamerica: [5, -168, 83, -52],
+      europe: [34, -25, 72, 45],
+      asia: [-10, 25, 81, 180],
+      africa: [-35, -18, 37, 52],
+      oceania: [-50, 110, 0, 180],
     };
 
-    const loadBtn = document.getElementById("loadBtn");
-    const countrySelect = document.getElementById("countrySelect");
     const tableBody = document.querySelector("#rankingTable tbody");
+    const continentSelect = document.getElementById("continentSelect");
+    const loadBtn = document.getElementById("loadBtn");
 
     function getAQIColor(aqi) {
       if (aqi <= 50) return "#009966";
@@ -113,28 +115,25 @@
       return "#7e0023";
     }
 
-    loadBtn.addEventListener("click", async () => {
-      const country = countrySelect.value;
-      if (country === "none") {
-        alert("Selecciona un país primero.");
-        return;
-      }
-
-      const bounds = countryBounds[country];
+    async function loadAQI(continent) {
+      const bounds = continentBounds[continent];
       const url = `https://api.waqi.info/map/bounds/?token=${token}&latlng=${bounds.join(",")}`;
-      tableBody.innerHTML = `<tr><td colspan="4">Cargando datos...</td></tr>`;
+
+      tableBody.innerHTML = `<tr><td colspan="4">Cargando datos de ${continent === "world" ? "todo el mundo" : continent}...</td></tr>`;
 
       try {
         const res = await fetch(url);
         const data = await res.json();
 
         if (data.status !== "ok" || !data.data.length) {
-          tableBody.innerHTML = `<tr><td colspan="4">No se encontraron estaciones para este país.</td></tr>`;
+          tableBody.innerHTML = `<tr><td colspan="4">No se encontraron estaciones.</td></tr>`;
           return;
         }
 
         // Ordenar por AQI descendente
-        const stations = data.data.sort((a, b) => b.aqi - a.aqi);
+        const stations = data.data
+          .filter(st => !isNaN(st.aqi))
+          .sort((a, b) => b.aqi - a.aqi);
 
         tableBody.innerHTML = "";
         stations.forEach((st, i) => {
@@ -151,9 +150,16 @@
         console.error(err);
         tableBody.innerHTML = `<tr><td colspan="4">Error al cargar datos. Intenta de nuevo.</td></tr>`;
       }
+    }
+
+    // Cargar ranking global al inicio
+    window.addEventListener("load", () => loadAQI("world"));
+
+    // Cargar según el continente elegido
+    loadBtn.addEventListener("click", () => {
+      const continent = continentSelect.value;
+      loadAQI(continent);
     });
   </script>
 </body>
 </html>
-
-
