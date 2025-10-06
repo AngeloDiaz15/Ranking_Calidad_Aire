@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Ranking Global de Calidad del Aire (AQI)</title>
+  <title>Global Air Quality Ranking (AQI)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
@@ -59,32 +59,32 @@
   </style>
 </head>
 <body>
-  <h1>🌍 Ranking Global de Calidad del Aire (AQI)</h1>
+  <h1>🌍 Global Air Quality Ranking (AQI)</h1>
 
-  <label for="continentSelect">Filtrar por continente:</label>
+  <label for="continentSelect">Filter by continent:</label>
   <select id="continentSelect">
     <option value="world">🌎 Global</option>
-    <option value="southamerica">América del Sur</option>
-    <option value="northamerica">América del Norte</option>
+    <option value="southamerica">South America</option>
+    <option value="northamerica">North America</option>
     <option value="europe">Europa</option>
     <option value="asia">Asia</option>
-    <option value="africa">África</option>
-    <option value="oceania">Oceanía</option>
+    <option value="africa">Africa</option>
+    <option value="oceania">Oceania</option>
   </select>
 
-  <button id="loadBtn">Actualizar</button>
+  <button id="loadBtn">Refresh</button>
 
   <table id="rankingTable">
     <thead>
       <tr>
-        <th>Posición</th>
-        <th>Ciudad / Estación</th>
+        <th>Position</th>
+        <th>City / Station</th>
         <th>AQI</th>
-        <th>Categoría</th>
+        <th>Categorie</th>
       </tr>
     </thead>
     <tbody>
-      <tr><td colspan="4">Cargando ranking global...</td></tr>
+      <tr><td colspan="4">Loading global ranking...</td></tr>
     </tbody>
   </table>
 
@@ -127,14 +127,14 @@
       const bounds = continentBounds[continent];
       const url = `https://api.waqi.info/map/bounds/?token=${token}&latlng=${bounds.join(",")}`;
 
-      tableBody.innerHTML = `<tr><td colspan="4">Cargando datos de ${continent === "world" ? "todo el mundo" : continent}...</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="4">Loading data: ${continent === "world" ? "Worldwide" : continent}...</td></tr>`;
 
       try {
         const res = await fetch(url);
         const data = await res.json();
 
         if (data.status !== "ok" || !data.data.length) {
-          tableBody.innerHTML = `<tr><td colspan="4">No se encontraron estaciones.</td></tr>`;
+          tableBody.innerHTML = `<tr><td colspan="4">No stations found.</td></tr>`;
           return;
         }
 
@@ -149,14 +149,14 @@
           tableBody.innerHTML += `
             <tr>
               <td>${i + 1}</td>
-              <td>${st.station?.name || "Desconocido"}</td>
+              <td>${st.station?.name || "Unknown"}</td>
               <td><span class="aqi-badge" style="background:${color}">${st.aqi}</span></td>
               <td style="color:${color}; font-weight:bold;">${category}</td>
             </tr>`;
         });
       } catch (err) {
         console.error(err);
-        tableBody.innerHTML = `<tr><td colspan="4">Error al cargar datos. Intenta de nuevo.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="4">Error loading data. Please try again.</td></tr>`;
       }
     }
 
@@ -165,3 +165,4 @@
   </script>
 </body>
 </html>
+
