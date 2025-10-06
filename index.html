@@ -80,7 +80,7 @@
         <th>Posición</th>
         <th>Ciudad / Estación</th>
         <th>AQI</th>
-        <th>Coordenadas</th>
+        <th>Categoría</th>
       </tr>
     </thead>
     <tbody>
@@ -91,7 +91,6 @@
   <script>
     const token = "090ca286c1bb00d992871976d77c05b6347a17d1";
 
-    // Coordenadas (bounds) por continente: [lat1, lng1, lat2, lng2]
     const continentBounds = {
       world: [-85, -180, 85, 180],
       southamerica: [-56, -82, 13, -34],
@@ -115,6 +114,15 @@
       return "#7e0023";
     }
 
+    function getAQICategory(aqi) {
+      if (aqi <= 50) return "Good";
+      if (aqi <= 100) return "Moderate";
+      if (aqi <= 150) return "Unhealthy for Sensitive Groups";
+      if (aqi <= 200) return "Unhealthy";
+      if (aqi <= 300) return "Very Unhealthy";
+      return "Hazardous";
+    }
+
     async function loadAQI(continent) {
       const bounds = continentBounds[continent];
       const url = `https://api.waqi.info/map/bounds/?token=${token}&latlng=${bounds.join(",")}`;
@@ -130,7 +138,6 @@
           return;
         }
 
-        // Ordenar por AQI descendente
         const stations = data.data
           .filter(st => !isNaN(st.aqi))
           .sort((a, b) => b.aqi - a.aqi);
@@ -138,12 +145,13 @@
         tableBody.innerHTML = "";
         stations.forEach((st, i) => {
           const color = getAQIColor(st.aqi);
+          const category = getAQICategory(st.aqi);
           tableBody.innerHTML += `
             <tr>
               <td>${i + 1}</td>
               <td>${st.station?.name || "Desconocido"}</td>
               <td><span class="aqi-badge" style="background:${color}">${st.aqi}</span></td>
-              <td>${st.lat.toFixed(2)}, ${st.lon.toFixed(2)}</td>
+              <td style="color:${color}; font-weight:bold;">${category}</td>
             </tr>`;
         });
       } catch (err) {
@@ -152,14 +160,8 @@
       }
     }
 
-    // Cargar ranking global al inicio
     window.addEventListener("load", () => loadAQI("world"));
-
-    // Cargar según el continente elegido
-    loadBtn.addEventListener("click", () => {
-      const continent = continentSelect.value;
-      loadAQI(continent);
-    });
+    loadBtn.addEventListener("click", () => loadAQI(continentSelect.value));
   </script>
 </body>
 </html>
